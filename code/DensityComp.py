@@ -14,9 +14,9 @@ Dir = '/Volumes/Elements/Data/EN4/netcdf_EN.4.2.2.analyses.g10/'
 
 # Choose the area and time of interest
 lat_min, lat_max, lon_min, lon_max = 30, 70, -20, 20
-year_min, year_max = 1900, 2022
+year_min, year_max = 1900, 2024
 
-for year in range(year_min, year_max):
+for year in range(year_min, year_max+1):
     EN4_file = 'EN.4.2.2.f.analysis.g10.'+str(year)+'*.nc'
     print('Working on file:'+EN4_file)
     EN4_d = xr.open_mfdataset(Dir+EN4_file)
@@ -29,7 +29,7 @@ for year in range(year_min, year_max):
     # Calculate pressure from depth, depth should be positive upward
     depth_a = np.array(temp.depth).copy()
     depth_a = depth_a.reshape( len(temp.depth), 1)
-    pres = gsw.p_from_z(-depth_a, temp.lat)
+    pres = gsw.p_from_z(-depth_a, temp.lat.data)
     
     # Reshape arrays for broadcasting
     pres = np.array(pres)
@@ -46,6 +46,8 @@ for year in range(year_min, year_max):
     ct = gsw.CT_from_pt(sa, temp)
 
     # Calculate density, thermal expansion and haline contraction coefficients
+    sa.load()
+    ct.load()
     rho, alpha, beta = gsw.rho_alpha_beta(sa, ct, pres)
 
     # Add metadata and plot with xarray
@@ -72,7 +74,7 @@ for year in range(year_min, year_max):
 
 # Add all variables into one dataset and export as NetCDF
 DENS_d = xr.merge((RHO, ALPHA, BETA))
-DENS_d['time'] = range(year_min, year_max)
+DENS_d['time'] = range(year_min, year_max+1)
 
 DENS_d.to_netcdf('density_teos10_en422_g10_'+ str(year_min) + '_' + str(year_max) + '.nc')
 
