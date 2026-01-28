@@ -15,10 +15,16 @@ import regionmask
 import statsmodels.api as sm
 lowess = sm.nonparametric.lowess
 
-PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
-PATH_Data = '/Users/dewilebars/Data/'
+#PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
+#PATH_Data = '/Users/dewilebars/Data/'
 
-tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual'
+#PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
+PATH_SLBudgets_data = '/Users/kyrab/Github/SLBudget/data/'
+#PATH_Data = '/Users/dewilebars/Data/'
+PATH_Data = '/Users/kyrab/Github/SlBudget/data/DataSteric/'
+
+#tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual'
+tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual_2024' #add_2024 for new data
 
 # Define a few constants
 er = 6.371e6 # Earth's radius in meters
@@ -255,6 +261,10 @@ def tide_gauge_obs(tg_id=[20, 22, 23, 24, 25, 32], interp=False):
                               sep=';', header=None, names=names_col2)
         tg_data = tg_data.set_index('time')
         tg_data.height = tg_data.height.where(~np.isclose(tg_data.height,-99999))
+
+        #Option to select data from 1960:
+        tg_data = tg_data.loc[1960:]
+
         tg_data.height = tg_data.height - tg_data.height.mean()
 
         if i==0:
