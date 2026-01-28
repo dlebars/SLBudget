@@ -257,6 +257,7 @@ def tide_gauge_obs(tg_id=[20, 22, 23, 24, 25, 32], interp=False):
     names_col2 = ('time', 'height', 'interpolated', 'flags')
 
     for i in range(len(tg_id)):
+        print(tg_id[i])
         tg_data = pd.read_csv(f'{tg_data_dir}/data/{tg_id[i]}.rlrdata', 
                               sep=';', header=None, names=names_col2)
         tg_data = tg_data.set_index('time')
@@ -382,7 +383,7 @@ def steric_masks_north_sea(da, mask_name):
     elif mask_name == 'EBB':
         # Extended bay of Biscay
         mask = xr.where(np.isnan(da[0,:,:,:]
-                                 .sel(depth=2000, method='nearest')), np.NaN, 1)
+                                 .sel(depth=2000, method='nearest')), np.nan, 1)
         mask = mask.where(mask.lon <= -2)
         mask = mask.where(mask.lon >= -12)
         mask = mask.where(mask.lat <= 52)
@@ -391,7 +392,7 @@ def steric_masks_north_sea(da, mask_name):
     elif mask_name == 'BB':
         # Bay of Biscay
         mask = xr.where(np.isnan(da[0,:,:,:]
-                                 .sel(depth=500, method='nearest')), np.NaN, 1)
+                                 .sel(depth=500, method='nearest')), np.nan, 1)
         mask = mask.where(mask.lon <= 0)
         mask = mask.where(mask.lon >= -10)
         mask = mask.where(mask.lat <= 50)
@@ -400,7 +401,7 @@ def steric_masks_north_sea(da, mask_name):
     elif mask_name == 'NWS':
         # Norwegian Sea
         mask = xr.where(np.isnan(da[0,:,:,:]
-                                 .sel(depth=2000, method='nearest')), np.NaN, 1)
+                                 .sel(depth=2000, method='nearest')), np.nan, 1)
         mask = mask.where(mask.lon <= 8)
         mask = mask.where(mask.lon >= -10)
         mask = mask.where(mask.lat <= 69)
