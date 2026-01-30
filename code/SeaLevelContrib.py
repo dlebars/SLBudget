@@ -15,10 +15,16 @@ import regionmask
 import statsmodels.api as sm
 lowess = sm.nonparametric.lowess
 
-PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
-PATH_Data = '/Users/dewilebars/Data/'
+#PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
+#PATH_Data = '/Users/dewilebars/Data/'
 
-tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual'
+#PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
+PATH_SLBudgets_data = '/Users/kyrab/Github/SLBudget/data/'
+#PATH_Data = '/Users/dewilebars/Data/'
+PATH_Data = '/Users/kyrab/Github/SlBudget/data/DataSteric/'
+
+#tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual'
+tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual_2024' #add_2024 for new data
 
 # Define a few constants
 er = 6.371e6 # Earth's radius in meters
@@ -251,10 +257,15 @@ def tide_gauge_obs(tg_id=[20, 22, 23, 24, 25, 32], interp=False):
     names_col2 = ('time', 'height', 'interpolated', 'flags')
 
     for i in range(len(tg_id)):
+        print(tg_id[i])
         tg_data = pd.read_csv(f'{tg_data_dir}/data/{tg_id[i]}.rlrdata', 
                               sep=';', header=None, names=names_col2)
         tg_data = tg_data.set_index('time')
         tg_data.height = tg_data.height.where(~np.isclose(tg_data.height,-99999))
+
+        #Option to select data from 1960:
+        tg_data = tg_data.loc[1960:]
+
         tg_data.height = tg_data.height - tg_data.height.mean()
 
         if i==0:
@@ -372,7 +383,7 @@ def steric_masks_north_sea(da, mask_name):
     elif mask_name == 'EBB':
         # Extended bay of Biscay
         mask = xr.where(np.isnan(da[0,:,:,:]
-                                 .sel(depth=2000, method='nearest')), np.NaN, 1)
+                                 .sel(depth=2000, method='nearest')), np.nan, 1)
         mask = mask.where(mask.lon <= -2)
         mask = mask.where(mask.lon >= -12)
         mask = mask.where(mask.lat <= 52)
@@ -381,7 +392,7 @@ def steric_masks_north_sea(da, mask_name):
     elif mask_name == 'BB':
         # Bay of Biscay
         mask = xr.where(np.isnan(da[0,:,:,:]
-                                 .sel(depth=500, method='nearest')), np.NaN, 1)
+                                 .sel(depth=500, method='nearest')), np.nan, 1)
         mask = mask.where(mask.lon <= 0)
         mask = mask.where(mask.lon >= -10)
         mask = mask.where(mask.lat <= 50)
@@ -390,7 +401,7 @@ def steric_masks_north_sea(da, mask_name):
     elif mask_name == 'NWS':
         # Norwegian Sea
         mask = xr.where(np.isnan(da[0,:,:,:]
-                                 .sel(depth=2000, method='nearest')), np.NaN, 1)
+                                 .sel(depth=2000, method='nearest')), np.nan, 1)
         mask = mask.where(mask.lon <= 8)
         mask = mask.where(mask.lon >= -10)
         mask = mask.where(mask.lat <= 69)
@@ -1134,6 +1145,25 @@ def local_budget(location, opt_sl, opt_steric, opt_glaciers, opt_antarctica,
         elif opt_antarctica == 'fred20':
             ant_df = contrib_frederikse2020(coord, 'AIS', output_type, 
                                             extrap=True)
+            # option to add GravIS data 
+        elif opt_antarctica == 'Gravis':
+            # 1. Use Frederikse for the years without Gravis data: 
+            fredant_df = contrib_frederikse2020(coord, 'AIS', output_type, extrap=True)
+            #2. Use Gravis data: 
+            Gravis_dir = '../outputs/Gravis_Results/'
+            Gravis_ant_ds = xr.open_dataset(f'{Gravis_dir}Gravis_Antarctica.nc')
+            sel_da = Gravis_ant_ds['IS_Gravis'].ffill('lon', 3).bfill('lon', 3)
+            loc_da = sel_da.sel(lat = coord[0], lon = coord[1], method = 'nearest')
+            gravis_df = loc_da.squeeze().reset_coords(drop=True).to_dataframe(name='Ant_gravis') 
+            gravis_df = gravis_df*1.1837950465122913 #for now corrected... 
+            #3. Make Antcombi consisting of the frederikse data 
+            Antcombi = fredant_df['Antarctica'].copy()
+            # Reference values to lign up the data
+            antfredreference = fredant_df['Antarctica'].loc[2014:2018].mean()
+            antgracereference = gravis_df['Ant_gravis'].loc[2014:2018].mean()
+            # Align GravIS data with frederikse data with the period 2014-2018 as a reference period. 
+            Antcombi.loc[2019:] = gravis_df['Ant_gravis'] - antgracereference + antfredreference 
+            ant_df = Antcombi.to_frame()
         else:
             print('ERROR: option for opt_antarctica undefined')
 
@@ -1143,6 +1173,24 @@ def local_budget(location, opt_sl, opt_steric, opt_glaciers, opt_antarctica,
         elif opt_greenland == 'fred20':
             green_df = contrib_frederikse2020(coord, 'GrIS', output_type, 
                                               extrap=True)
+        elif opt_greenland == 'Gravis':
+            # Combine Frederikse data and Gravis: Frederikse for the years without GravIS
+            fredgre_df = contrib_frederikse2020(coord, 'GrIS', output_type, extrap=True)
+            # Only works if land tiles form the landsea mask are nan (currently this is the case in the file). 
+            Gravis_dir = '../outputs/Gravis_Results/'
+            Gravis_gre_ds = xr.open_dataset(f'{Gravis_dir}Gravis_Greenland.nc')
+            sel_da = Gravis_gre_ds['IS_Gravis'].ffill('lon', 3).bfill('lon', 3)
+            loc_da = sel_da.sel(lat = coord[0], lon = coord[1], method = 'nearest')
+            gravis_df = loc_da.squeeze().reset_coords(drop=True).to_dataframe(name='Gre_gravis') 
+            # Make Greencombi consisting of Frederikse data for data before 2018 and use Gravis after 2018. 
+            Greencombi = fredgre_df['Greenland'].copy()
+            # Create a reference data to allign the data:
+            grefredreference = fredgre_df['Greenland'].loc[2014:2018].mean()
+            gregracereference = gravis_df['Gre_gravis'].loc[2014:2018].mean()
+            # Allign GravIs data with Frederikse data based on the reference period based on the mean betweeen 2014 and 2018. 
+            Greencombi.loc[2019:] = gravis_df['Gre_gravis'] - gregracereference + grefredreference 
+            green_df = Greencombi.to_frame()
+
         else:
             print('ERROR: option for opt_greenland undefined')
         
@@ -1196,7 +1244,8 @@ def local_budget(location, opt_sl, opt_steric, opt_glaciers, opt_antarctica,
             slall_df = pd.concat([slall_df, sealevel_df], axis=1)
 
     if avg:        # Compute the average contributors at all tide gauges
-        slmean_df = slall_df.groupby(level=1, axis=1, sort=False).mean()
+        #slmean_df = slall_df.groupby(level=1, axis=1, sort=False).mean() # Only works for old version of python
+        slmean_df = slall_df.T.groupby(level=1, sort=False).mean().T  #the new version of python does not work with axis is 0. in stead of that, t makes the transpose. I compared both outputs and they should be equal. 
         slmean_df = slmean_df.join(sl_df.Average, how='inner')
         slmean_df = slmean_df.rename(columns={'Average': 'Obs'})
         slall_df = slmean_df
