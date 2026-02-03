@@ -15,16 +15,9 @@ import regionmask
 import statsmodels.api as sm
 lowess = sm.nonparametric.lowess
 
-#PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
-#PATH_Data = '/Users/dewilebars/Data/'
-
-#PATH_SLBudgets_data = '/Users/dewilebars/Projects/SLBudget/data/'
-PATH_SLBudgets_data = '/Users/kyrab/Github/SLBudget/data/'
-#PATH_Data = '/Users/dewilebars/Data/'
-PATH_Data = '/Users/kyrab/Github/SlBudget/data/DataSteric/'
-
-#tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual'
-tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual_2024' #add_2024 for new data
+PATH_SLBudgets_data = '../data/'
+PATH_Data = '/Users/dewilebars/Data/'
+tg_data_dir = f'{PATH_SLBudgets_data}rlr_annual'
 
 # Define a few constants
 er = 6.371e6 # Earth's radius in meters
@@ -61,18 +54,12 @@ def make_wind_df(lat_i, lon_i, product):
         
     elif product == 'ERA5':
         ERA5_dir = PATH_SLBudgets_data + 'WindPressure/ERA5/'      
-        u_file = [ERA5_dir + 'ERA5_be_u10.nc', 
-                  ERA5_dir + 'ERA5_u10.nc',
-                  ERA5_dir + 'ERA5_u10_2021.nc']
-        v_file = [ERA5_dir + 'ERA5_be_v10.nc', 
-                  ERA5_dir + 'ERA5_v10.nc',
-                  ERA5_dir + 'ERA5_v10_2021.nc']
-        p_file = [ERA5_dir + 'ERA5_be_msl.nc', 
-                  ERA5_dir + 'ERA5_msl.nc',
-                  ERA5_dir + 'ERA5_msl_2021.nc']
+        u_file = [ERA5_dir + 'ERA5_u10.nc']
+        v_file = [ERA5_dir + 'ERA5_v10.nc']
+        p_file = [ERA5_dir + 'ERA5_msl.nc']
         latn = 'latitude'
         lonn = 'longitude'
-        timen = 'time'
+        timen = 'valid_time'
         un = 'u10'
         vn = 'v10'
         pn = 'msl'
@@ -264,7 +251,7 @@ def tide_gauge_obs(tg_id=[20, 22, 23, 24, 25, 32], interp=False):
         tg_data.height = tg_data.height.where(~np.isclose(tg_data.height,-99999))
 
         #Option to select data from 1960:
-        tg_data = tg_data.loc[1960:]
+        #tg_data = tg_data.loc[1960:]
 
         tg_data.height = tg_data.height - tg_data.height.mean()
 
@@ -440,7 +427,7 @@ def read_density(data_source):
                        'density_teos10_en4_1900_2019.nc')
     elif data_source == 'EN4_22':
         density_ds = xr.open_dataset(PATH_SLBudgets_data + 
-                       'DataSteric/density_teos10_en422_g10_1900_2022.nc')
+                       'DataSteric/density_teos10_en422_g10_1900_2024.nc')
     else:
         print('ERROR: data_source not defined')
         
@@ -553,7 +540,7 @@ def tg_lat_lon(tg_id):
     filelist_df = pd.read_csv(tg_data_dir + '/filelist.txt', sep=';', header=None, names=names_col)
     filelist_df = filelist_df.set_index('id')
     
-    return filelist_df.loc[tg_id].lat, filelist_df.loc[tg_id].lon
+    return filelist_df.loc[tg_id].lat.item(), filelist_df.loc[tg_id].lon.item()
 
 def glaciers_m15_glo():
     '''Provides glacier contributions to local sea level between 1900 and 2013
@@ -1007,7 +994,7 @@ def contrib_frederikse2020(coord, var, output_type='rsl', extrap=False):
         nby = 10
         trend = np.polyfit(df.index[-nby:], df.iloc[-nby:], 1)
         
-        for i in range(3):
+        for i in range(8):
             df.loc[df.index.max() + 1] = (trend[1]+trend[0]*(df.index.max()+1))
     
     return df
@@ -1050,7 +1037,7 @@ def contrib_frederikse2020_glob(var, extrap=False, quant='mean'):
         nby = 10
         trend = np.polyfit(out_df.index[-nby:], out_df.iloc[-nby:], 1)
         
-        for i in range(3):
+        for i in range(6):
             out_df.loc[out_df.index.max() + 1] = (
                 trend[1]+trend[0]*(out_df.index.max()+1))
     
@@ -1331,3 +1318,47 @@ def plot_budget(location_name, slmean_df):
                  transform=ax[1,1].transAxes)
     
     return fig, ax
+
+def plot_budget_ts(slmean_df):
+    '''Plot time series of contributors'''
+    
+    # Combined contributors plot:
+    slmean_df['Steric'] = slmean_df['LocSteric'] + slmean_df['GloSteric']
+    slmean_df['IceSheets'] = slmean_df['Glaciers'] + slmean_df['Antarctica'] + slmean_df['Greenland']
+    slmean_df['WindPressure'] = slmean_df['Wind'] + slmean_df['Pressure']
+    # Columns to plot (aggregated)
+    contributors_agg = ['Steric', 'GIA', 'IceSheets', 'TWS', 'Nodal', 'WindPressure']
+    
+    #legend
+    legend_labels = {
+        'Steric': 'Steric (local + global)',
+        'IceSheets': 'Antarctica, Greenland and glaciers',
+        'WindPressure': 'Wind + Pressure',
+        'GIA': 'GIA',
+        'TWS': 'TWS',
+        'Nodal': 'Nodal',
+        'Total': 'Total (sum of contributors)',
+        'Obs': 'Observations'
+    }
+    
+    # Color scheme
+    colors_agg = ['blue', 'green', 'magenta', 'orange', 'black', 'cyan']
+    
+    # Figure to save: 
+    fig2, ax2 = plt.subplots(figsize=(12,8))
+    for col, color in zip(contributors_agg, colors_agg):
+        ax2.plot(slmean_df[col] - slmean_df[col].iloc[0], color=color, label=legend_labels[col])
+    ax2.plot(slmean_df['Total'] - slmean_df['Total'].iloc[0], color='red', label='Total')
+    ax2.plot(slmean_df['Obs'] - slmean_df['Obs'].iloc[0], 'o-', label='Observations')
+    ax2.set_xlabel('Time (year)', fontsize=16)
+    ax2.set_ylabel(f'Sea level contribution relative to {slmean_df.index[0].item()} (cm)', fontsize=16)
+    ax2.set_title('Local sea level budget', fontsize=18)
+    ax2.grid(True)
+    ax2.legend(loc='upper left', fontsize=13)
+    
+    # Increase tick label size
+    ax2.tick_params(axis='both', which='major', labelsize=14)
+
+    fig2.tight_layout()
+
+    return fig2, ax2
