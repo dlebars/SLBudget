@@ -1321,17 +1321,19 @@ def plot_budget(location_name, slmean_df):
 
 def plot_budget_ts(slmean_df):
     '''Plot time series of contributors'''
+
+    df = slmean_df.copy()
     
     # Combined contributors plot:
-    slmean_df['Steric'] = slmean_df['LocSteric'] + slmean_df['GloSteric']
-    slmean_df['IceSheets'] = slmean_df['Glaciers'] + slmean_df['Antarctica'] + slmean_df['Greenland']
-    slmean_df['WindPressure'] = slmean_df['Wind'] + slmean_df['Pressure']
+    df['Steric'] = df['LocSteric'] + df['GloSteric']
+    df['IceSheets'] = df['Glaciers'] + df['Antarctica'] + df['Greenland']
+    df['WindPressure'] = df['Wind'] + df['Pressure']
     # Columns to plot (aggregated)
     contributors_agg = ['Steric', 'GIA', 'IceSheets', 'TWS', 'Nodal', 'WindPressure']
     
     #legend
     legend_labels = {
-        'Steric': 'Steric (local + global)',
+        'Steric': 'Regional steric',
         'IceSheets': 'Antarctica, Greenland and glaciers',
         'WindPressure': 'Wind + Pressure',
         'GIA': 'GIA',
@@ -1345,13 +1347,13 @@ def plot_budget_ts(slmean_df):
     colors_agg = ['blue', 'green', 'magenta', 'orange', 'black', 'cyan']
     
     # Figure to save: 
-    fig2, ax2 = plt.subplots(figsize=(12,8))
+    fig2, ax2 = plt.subplots(figsize=(10,6))
     for col, color in zip(contributors_agg, colors_agg):
-        ax2.plot(slmean_df[col] - slmean_df[col].iloc[0], color=color, label=legend_labels[col])
-    ax2.plot(slmean_df['Total'] - slmean_df['Total'].iloc[0], color='red', label='Total')
-    ax2.plot(slmean_df['Obs'] - slmean_df['Obs'].iloc[0], 'o-', label='Observations')
+        ax2.plot(df[col] - df[col].iloc[0], color=color, label=legend_labels[col])
+    ax2.plot(df['Total'] - df['Total'].iloc[0], color='red', label='Total')
+    ax2.plot(df['Obs'] - df['Obs'].iloc[0], 'o-', label='Observations')
     ax2.set_xlabel('Time (year)', fontsize=16)
-    ax2.set_ylabel(f'Sea level contribution relative to {slmean_df.index[0].item()} (cm)', fontsize=16)
+    ax2.set_ylabel(f'Sea level contribution relative to {df.index[0].item()} (cm)', fontsize=16)
     ax2.set_title('Local sea level budget', fontsize=18)
     ax2.grid(True)
     ax2.legend(loc='upper left', fontsize=13)
