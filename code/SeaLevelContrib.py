@@ -1092,8 +1092,8 @@ def local_budget(location, opt_sl, opt_steric, opt_glaciers, opt_antarctica,
             print('ERROR: option for global_steric undefined')
         
         steric_df = steric_df.join(glo_steric_df)
-        steric_df = steric_df.rename(columns={'Steric': 'LocSteric'})
-        steric_df['LocSteric'] = steric_df['LocSteric'] - steric_df['GloSteric']
+        steric_df = steric_df.rename(columns={'Steric': 'RegSteric'})
+        steric_df['RegSteric'] = steric_df['RegSteric'] - steric_df['GloSteric']
     
     for i in range(cond_loop):
         
@@ -1299,10 +1299,10 @@ def plot_budget(location_name, slmean_df):
     ax[1,0].hlines(y=lin_trend[-1], xmin=-0.5, xmax=0.5, color='black')
     ax[1,0].set_ylabel('Linear trend (mm/year)')
     ax[1,0].legend(handles=legend_elements, loc='upper right')
-    ax[1,0].text(0.02, 0.01, 
+    ax[1,0].text(0.4, 0.95, 
                  f'Observed trend: {round(lin_trend[-1],2)}\n'+ 
                  f'Budget trend: {round(lin_trend[0],2)}', 
-                 va='bottom', ha='left', 
+                 va='top', ha='center', 
                  transform=ax[1,0].transAxes)
 
     ax[1,1].set_title('Acceleration budget')
@@ -1325,7 +1325,7 @@ def plot_budget_ts(slmean_df):
     df = slmean_df.copy()
     
     # Combined contributors plot:
-    df['Steric'] = df['LocSteric'] + df['GloSteric']
+    df['Steric'] = df['RegSteric'] + df['GloSteric']
     df['IceSheets'] = df['Glaciers'] + df['Antarctica'] + df['Greenland']
     df['WindPressure'] = df['Wind'] + df['Pressure']
     # Columns to plot (aggregated)
