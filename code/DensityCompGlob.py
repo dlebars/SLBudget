@@ -9,25 +9,25 @@ import numpy as np
 import xarray as xr
 import gsw
 
-Dir = '/Volumes/Elements/Data/EN4/netcdf_EN.4.2.1.analyses.g10/'
+Dir = '/Volumes/Elements/Data/EN4/netcdf_EN.4.2.2.analyses.g10/'
+Dir_out = '/Volumes/Elements/Data/EN4/global_density_EN.4.2.2.analyses.g10/'
 
 # Choose the time of interest
-year_min, year_max = 1900, 2019
+year_min, year_max = 1900, 2024
 
-for year in range(year_min, year_max):
-    EN4_file = 'EN.4.2.1.f.analysis.g10.'+str(year)+'*.nc'
+for year in range(year_min, year_max+1):
+    EN4_file = 'EN.4.2.2.f.analysis.g10.'+str(year)+'*.nc'
     print('Working on file:'+EN4_file)
     EN4_d = xr.open_mfdataset(Dir+EN4_file)
-    EN4_d.lon.values = (((EN4_d.lon + 180 ) % 360) - 180)
+    EN4_d = EN4_d.assign_coords({'lon':(((EN4_d['lon'] + 180 ) % 360) - 180)})
     EN4_d = EN4_d.sortby(EN4_d.lon)
-    #EN4_d = EN4_d.sel(lat=slice(lat_min,lat_max),lon=slice(lon_min,lon_max))
     temp = EN4_d.temperature.mean(dim='time') - 272.15 # Convert from Kelvin to Celsius
     sal = EN4_d.salinity.mean(dim='time')
     
     # Calculate pressure from depth, depth should be positive upward
     depth_a = np.array(temp.depth).copy()
     depth_a = depth_a.reshape( len(temp.depth), 1)
-    pres = gsw.p_from_z(-depth_a, temp.lat)
+    pres = gsw.p_from_z(-depth_a, temp.lat.data)
     
     # Reshape arrays for broadcasting
     pres = np.array(pres)
@@ -44,6 +44,8 @@ for year in range(year_min, year_max):
     ct = gsw.CT_from_pt(sa, temp)
 
     # Calculate density, thermal expansion and haline contraction coefficients
+    sa.load()
+    ct.load()
     rho, alpha, beta = gsw.rho_alpha_beta(sa, ct, pres)
 
     # Add metadata and plot with xarray
@@ -58,20 +60,12 @@ for year in range(year_min, year_max):
                'Conservative Temperature', 'units' : 'kg/g'}
     beta  = xr.DataArray(beta, coords=[temp.depth, temp.lat, temp.lon], \
                          dims=['depth', 'lat', 'lon'], name='beta', attrs=beta_at)
-    
-    # Add all variables into one dataset and export as NetCDF
-    # Use following line to include multiple variables into the dataset:
-    #if year == year_min:
-    #    RHO = rho
-    #    ALPHA = alpha
-    #    BETA = beta
-    #else:
-    #    RHO = xr.concat((RHO, rho),dim='time')
-    #    ALPHA = xr.concat((ALPHA, alpha),dim='time')
-    #    BETA = xr.concat((BETA, beta),dim='time')
 
-    #DENS_d = xr.merge((RHO, ALPHA, BETA))
-    #DENS_d['time'] = range(year_min, year_max)
-    #DENS_d.to_netcdf('density_teos10_en4_'+ str(year_min) + '_' + str(year_max) + '.nc')
-    rho.to_netcdf(Dir+'density_teos10_en4_'+ str(year) + '.nc')
+    rho = rho.expand_dims(dim={'time': [year]})
+    alpha = alpha.expand_dims(dim={'time': [year]})
+    beta = beta.expand_dims(dim={'time': [year]})
+    
+    rho.to_netcdf(Dir_out+'global_teos10_en4_density_'+ str(year) + '.nc')
+    alpha.to_netcdf(Dir_out+'gloal_teos10_en4_alpha_'+ str(year) + '.nc')
+    beta.to_netcdf(Dir_out+'global_teos10_en4_beta_'+ str(year) + '.nc')
 
