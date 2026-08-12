@@ -434,7 +434,7 @@ def read_density(data_source):
                        'density_teos10_en4_1900_2019.nc')
     elif data_source == 'EN4_22':
         density_ds = xr.open_dataset(PATH_SLBudgets_data + 
-                       'DataSteric/density_teos10_en422_g10_1900_2024.nc')
+                       'DataSteric/density_teos10_en422_g10_1900_2025.nc')
     else:
         print('ERROR: data_source not defined')
         
@@ -1044,7 +1044,7 @@ def contrib_frederikse2020_glob(var, extrap=False, quant='mean'):
         nby = 10
         trend = np.polyfit(out_df.index[-nby:], out_df.iloc[-nby:], 1)
         
-        for i in range(6):
+        for i in range(7):
             out_df.loc[out_df.index.max() + 1] = (
                 trend[1]+trend[0]*(out_df.index.max()+1))
     
@@ -1360,7 +1360,7 @@ def plot_budget_ts(slmean_df):
     ax2.plot(df['Total'] - df['Total'].iloc[0], color='red', label='Total')
     ax2.plot(df['Obs'] - df['Obs'].iloc[0], 'o-', label='Observations')
     ax2.set_xlabel('Time (year)', fontsize=16)
-    ax2.set_ylabel(f'Sea level contribution relative to {df.index[0].item()} (cm)', fontsize=16)
+    ax2.set_ylabel(f'Sea level contribution relative to {df.index[0]} (cm)', fontsize=16)
     ax2.set_title('Local sea level budget', fontsize=18)
     ax2.grid(True)
     ax2.legend(loc='upper left', fontsize=13)
