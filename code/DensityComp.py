@@ -14,7 +14,7 @@ Dir = '/Volumes/Elements/Data/EN4/netcdf_EN.4.2.2.analyses.g10/'
 
 # Choose the area and time of interest
 lat_min, lat_max, lon_min, lon_max = 30, 70, -20, 20
-year_min, year_max = 1900, 2024
+year_min, year_max = 1900, 2025
 
 for year in range(year_min, year_max+1):
     EN4_file = 'EN.4.2.2.f.analysis.g10.'+str(year)+'*.nc'
