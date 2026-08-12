@@ -8,43 +8,7 @@ import xesmf as xe                     # package for regridding
 import gravity_toolkit as gravtk
 
 import sys
-sys.path.append('../code')
-
-
-def yearlygrace(gracedata):
-    '''
-    Uses the gridded data from Gravis (greenland or antarctica) as an input value and then creates a similar dataset using the same layout. 
-    '''
-    
-    # Drop dm, time_dec, and the old time coordinate: this is everything that dempends on time
-    ant_y = gracedata.drop_vars(['dm', 'time_dec', 'time'], errors='ignore')
-
-    # Resample dm to yearly
-    dm_y = gracedata['dm'].resample(time='1Y').mean(keep_attrs=True)
-    # Ensure correct order
-    dm_y = dm_y.transpose('time', 'y', 'x')
-
-    # Assign dm back
-    ant_y = ant_y.assign({'dm': dm_y})
-
-    # Assign the time coordinate from dm_y (now no conflicts)
-    ant_y = ant_y.assign_coords(time=dm_y['time'])
-
-    # Compute decimal year as a NumPy array
-    time_dec = ant_y["time"].dt.year 
-
-    # Add it as a new variable (not just a coordinate)
-    ant_y["time_dec"] = ("time", time_dec.data)
-
-    # Add metadata (optional but good practice)
-    ant_y["time_dec"].attrs = {
-        "long_name": "Decimal year",
-        "units": "year"
-    }
-
-    return ant_y 
-
-    
+sys.path.append('../code')   
 
 def sealevelfunctions(meltrates, lon_target, lat_target, landsea):
     #Uses as input the regridded melt values and the landseamaks with the same dimensions
@@ -81,7 +45,7 @@ def makefrederiksefile(data, meanrise):
         coords = {
             'lon': data['lon'].values, 
             'lat': data['lat'].values,
-            'time': data['time'].dt.year.values
+            'time': data['time'].values
         },
         data_vars = {
             'IS_Gravis': (['time', 'lat', 'lon'], data.values),
@@ -100,6 +64,6 @@ def makefrederiksefile(data, meanrise):
     ant_costg['Meanslr'].attrs = {
         'long_name': 'Mean IS_Gravis over ocean',
         'description': 'Mean over all ocean grid cells (union_mask==0)',
-        'units': 'm'
+        'units': 'cm'
     }
     return ant_costg
