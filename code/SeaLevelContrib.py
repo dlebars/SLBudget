@@ -1,12 +1,18 @@
 # List of functions to be used in sea level budget
 
 import datetime
-import netCDF4
 import numpy as np
 import pandas as pd
 import statsmodels.api as sm
 import xarray as xr
 import gzip
+
+# Need this to remove a module inconsistency
+import sys
+import esmpy
+# Point ESMF to esmpy in system modules
+sys.modules['ESMF'] = esmpy
+
 import xesmf as xe
 import matplotlib.pyplot as plt
 from matplotlib.lines import Line2D
@@ -175,28 +181,29 @@ def make_wpn_ef(coord, tgm_df, with_nodal, with_trend, product):
     return wpn_ef_df
 
 def make_waqua_df(tg_id):
-    '''Read time series of annually averaged sea level from the WAQUA model forced by ERA-interim.'''
-    dir_waqua = PATH_SLBudgets_data + 'DataWAQUANinaERAI'
-    ds_wa = netCDF4.Dataset(dir_waqua+'/ERAintWAQUA_waterlevels_speed_1979_2015.nc')
+    print('ERROR: This function is not supported anymore. Need to remove netCDF4 dependence.')
+    # '''Read time series of annually averaged sea level from the WAQUA model forced by ERA-interim.'''
+    # dir_waqua = PATH_SLBudgets_data + 'DataWAQUANinaERAI'
+    # ds_wa = netCDF4.Dataset(dir_waqua+'/ERAintWAQUA_waterlevels_speed_1979_2015.nc')
 
-    # Get WAQUA tide gauge names that are not editted in the same way as PSMSL names
-    names_col = ('id', 'lat', 'lon', 'name', 'coastline_code', 'station_code', 'quality')
-    filelist_df = pd.read_csv(tg_data_dir + '/filelist.txt', sep=';', header=None, names=names_col)
-    filelist_df = filelist_df.set_index('id')
-    tgn = filelist_df.name[tg_id].replace('-', '').replace(' ', '')
-    tgn = tgn.lower()[:8]
+    # # Get WAQUA tide gauge names that are not editted in the same way as PSMSL names
+    # names_col = ('id', 'lat', 'lon', 'name', 'coastline_code', 'station_code', 'quality')
+    # filelist_df = pd.read_csv(tg_data_dir + '/filelist.txt', sep=';', header=None, names=names_col)
+    # filelist_df = filelist_df.set_index('id')
+    # tgn = filelist_df.name[tg_id].replace('-', '').replace(' ', '')
+    # tgn = tgn.lower()[:8]
     
-    dh = ds_wa[tgn + '/WAQUA_surge'][:]*100
-    time_wa = ds_wa['time'][:]
-    t_wa = netCDF4.num2date(time_wa, ds_wa.variables['time'].units)
+    # dh = ds_wa[tgn + '/WAQUA_surge'][:]*100
+    # time_wa = ds_wa['time'][:]
+    # t_wa = netCDF4.num2date(time_wa, ds_wa.variables['time'].units)
 
-    t_wa_y = np.empty_like(t_wa)
+    # t_wa_y = np.empty_like(t_wa)
     
-    for i in range(len(t_wa)):
-        t_wa_y[i] = t_wa[i].year
+    # for i in range(len(t_wa)):
+    #     t_wa_y[i] = t_wa[i].year
         
-    waqua_df = pd.DataFrame( data = dict( time=t_wa_y, WindPressure=dh.data) )
-    waqua_df = waqua_df.set_index('time')
+    # waqua_df = pd.DataFrame( data = dict( time=t_wa_y, WindPressure=dh.data) )
+    # waqua_df = waqua_df.set_index('time')
     
     return waqua_df
 
