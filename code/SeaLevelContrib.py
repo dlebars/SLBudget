@@ -1265,9 +1265,9 @@ def plot_budget(location_name, slmean_df):
     diff_df = slmean_df.Obs - slmean_df.Total
     diff_df = diff_df - diff_df.mean()
 
-    t = ('Normalised RMSE (cm): '+
+    t = ('RMSE (cm): '+
          str( round(np.sqrt( (diff_df**2).sum() ) / len(diff_df), 2 ))+ '\n' +
-         'Normalised AE (cm): '+
+         'AE (cm): '+
          str( round( np.abs(diff_df).sum() / len(diff_df),2)))
     ax[0,1].text(0.98, 0.98, t, ha='right', va='top', transform=ax[0,1].transAxes)
     ax[0,1].set_title('Difference observations - budget')
