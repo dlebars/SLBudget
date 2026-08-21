@@ -1266,7 +1266,7 @@ def plot_budget(location_name, slmean_df):
     diff_df = diff_df - diff_df.mean()
 
     t = ('RMSE (cm): '+
-         str( round(np.sqrt( (diff_df**2).sum() ) / len(diff_df), 2 ))+ '\n' +
+         str( round(np.sqrt( (diff_df**2).sum() / len(diff_df)), 2 ))+ '\n' +
          'AE (cm): '+
          str( round( np.abs(diff_df).sum() / len(diff_df),2)))
     ax[0,1].text(0.98, 0.98, t, ha='right', va='top', transform=ax[0,1].transAxes)
