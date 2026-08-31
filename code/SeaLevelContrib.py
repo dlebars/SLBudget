@@ -1,5 +1,6 @@
 # List of functions to be used in sea level budget
 
+import os
 import datetime
 import numpy as np
 import pandas as pd
@@ -181,62 +182,94 @@ def make_wpn_ef(coord, tgm_df, with_nodal, with_trend, product):
     return wpn_ef_df
 
 def make_waqua_df(tg_id):
-    print('ERROR: This function is not supported anymore. Need to remove netCDF4 dependence.')
-    # '''Read time series of annually averaged sea level from the WAQUA model forced by ERA-interim.'''
-    # dir_waqua = PATH_SLBudgets_data + 'DataWAQUANinaERAI'
-    # ds_wa = netCDF4.Dataset(dir_waqua+'/ERAintWAQUA_waterlevels_speed_1979_2015.nc')
+    """Read time series of annually averaged sea level from the WAQUA model forced by ERA-interim."""
+    dir_waqua = os.path.join(PATH_SLBudgets_data, "DataWAQUANinaERAI")
+    filepath = os.path.join(dir_waqua, "ERAintWAQUA_waterlevels_speed_1979_2015.nc")
 
-    # # Get WAQUA tide gauge names that are not editted in the same way as PSMSL names
-    # names_col = ('id', 'lat', 'lon', 'name', 'coastline_code', 'station_code', 'quality')
-    # filelist_df = pd.read_csv(tg_data_dir + '/filelist.txt', sep=';', header=None, names=names_col)
-    # filelist_df = filelist_df.set_index('id')
-    # tgn = filelist_df.name[tg_id].replace('-', '').replace(' ', '')
-    # tgn = tgn.lower()[:8]
-    
-    # dh = ds_wa[tgn + '/WAQUA_surge'][:]*100
-    # time_wa = ds_wa['time'][:]
-    # t_wa = netCDF4.num2date(time_wa, ds_wa.variables['time'].units)
+    filelist_df = read_tg_info()
 
-    # t_wa_y = np.empty_like(t_wa)
-    
-    # for i in range(len(t_wa)):
-    #     t_wa_y[i] = t_wa[i].year
-        
-    # waqua_df = pd.DataFrame( data = dict( time=t_wa_y, WindPressure=dh.data) )
-    # waqua_df = waqua_df.set_index('time')
-    
+    tgn = filelist_df.name[tg_id].replace("-", "").replace(" ", "").lower()[:8]
+
+    # Open root dataset to extract the shared 'time' dimension
+    with xr.open_dataset(filepath) as ds_root:
+        t_wa_y = ds_root["time"].dt.year.values
+
+    # Open the specific group for this station
+    with xr.open_dataset(filepath, group=tgn) as ds_group:
+        dh = ds_group["WAQUA_surge"].values * 100
+
+    waqua_df = pd.DataFrame(data={"time": t_wa_y, "WindPressure": dh})
+    waqua_df = waqua_df.set_index("time")
+
     return waqua_df
 
 def make_gtsm_df(tg_id, var):
-    ''' 
-    Read GTSM yearly averaged data and return a dataframe.
-    var: waterlevel, surge 
-    '''
-    gtsm_df = pd.read_csv('../data/GTSM_yearly/reanalysis_mean_nl.csv', index_col=0, parse_dates=['time'])
+    """Read GTSM yearly averaged data and return a dataframe.
+
+    var: waterlevel, surge
+    """
+    gtsm_df = pd.read_csv(
+        "../data/GTSM_yearly/reanalysis_mean_nl.csv",
+        index_col=0,
+        parse_dates=["time"],
+    )
+
     # Change column names to the tide gauge IDs
     stations = [25, 32, 20, 24, 23, 22]
     gtsm_df.columns = stations + list(gtsm_df.columns[-3:])
-    gtsm_df['year'] = gtsm_df.time.dt.year
-    
-    df = gtsm_df.query(f'variable == "{var}"').sort_values('time')
-    del(df['time'])
-    df.rename(columns={'year':'time'}, inplace=True)
-    df = df.groupby('time').agg('mean').reset_index()
-    df.set_index('time', inplace=True)
+    gtsm_df["time"] = gtsm_df["time"].dt.year
 
-    df = df*100 # Convert from m to cm
-    df = df[[tg_id]]
-    df.rename(columns={tg_id:'WindPressure'}, inplace=True)
-    
+    # Filter by variable and select only numeric station columns + the time column
+    df = gtsm_df.query(f'variable == "{var}"').sort_values("time")
+
+    # Aggregate taking numeric_only=True to prevent TypeError on string/metadata columns
+    df = df.groupby("time")[stations].mean()
+
+    # Convert from m to cm
+    df = df * 100
+
+    # Select target tide gauge and rename column
+    df = df[[tg_id]].rename(columns={tg_id: "WindPressure"})
+
     return df
+
+def make_gtsm2_df(tg_id):
+    '''Read the new gtsm text files specifically made for the zeespiegelmonitor 
+    2026'''
+    
+    gtsm_df = pd.read_csv("../data/GTSM_yearly/gtsm_surge_annual_mean_main_stations.csv", 
+                          comment="#")
+    
+    names_dict = {20:"Vlissingen", 
+                  22:"Hoek van Holland", 
+                  23:"Den Helder", 
+                  24:"Delfzijl", 
+                  25:"Harlingen", 
+                  32:"IJmuiden"}
+    
+    tgn = names_dict[tg_id]
+    
+    df = gtsm_df.loc[gtsm_df.name==tgn]
+    df = df.set_index("t")
+    df = df["surge"]
+    
+    # Convert from m to cm
+    df = df * 100
+
+    df_out = pd.DataFrame(data={"time": df.index, "WindPressure": df.values})
+    df_out = df_out.set_index("time")
+
+    return df_out
 
 def read_tg_info():
     '''Read csv file containing the information about all tide gauges and export 
     as pandas dataframe'''
     
     names_col = ('id', 'lat', 'lon', 'name', 'coastline_code', 'station_code', 'quality')
-    filelist_df = pd.read_csv(f'{tg_data_dir}/filelist.txt', sep=';', 
-                              header=None, names=names_col)
+    filelist_df = pd.read_csv(os.path.join(tg_data_dir, "filelist.txt"),
+                              sep=';', 
+                              header=None, 
+                              names=names_col)
     filelist_df = filelist_df.set_index('id')
     
     filelist_df['name'] = [n.strip() for n in filelist_df['name']]
@@ -1219,6 +1252,8 @@ def local_budget(location, opt_sl, opt_steric, opt_glaciers, opt_antarctica,
                 wpn_ef_df = make_waqua_df(location[i])
             elif opt_wind_ibe[1] == 'GTSM':
                 wpn_ef_df = make_gtsm_df(location[i], 'surge')
+            elif opt_wind_ibe[1] == 'GTSM2':
+                wpn_ef_df = make_gtsm2_df(location[i])
             else:
                 print('ERROR: option for opt_wind_ibe[1] undefined')
         else:
@@ -1334,7 +1369,9 @@ def plot_budget_ts(slmean_df):
     # Combined contributors plot:
     df['Steric'] = df['RegSteric'] + df['GloSteric']
     df['IceSheets'] = df['Glaciers'] + df['Antarctica'] + df['Greenland']
-    df['WindPressure'] = df['Wind'] + df['Pressure']
+    if not "WindPressure" in slmean_df.columns:
+        df['WindPressure'] = df['Wind'] + df['Pressure']
+        
     # Columns to plot (aggregated)
     contributors_agg = ['Steric', 'GIA', 'IceSheets', 'TWS', 'Nodal', 'WindPressure']
     
