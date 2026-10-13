@@ -709,30 +709,46 @@ def glaciers_zemp19(tg_id, extrap=False, del_green=False):
             zemp_loc_tot_df.Glaciers.iloc[-1] + trend
     return zemp_loc_tot_df
 
-def ant_imbie18(extrap=False):
-    '''Read IMBIE 2018 excel data, compute yearly averages and return a data 
-    frame of sea level rise in cm'''
-    imbie_dir = PATH_SLBudgets_data + 'Antarctica/IMBIE2018/'
-    im_df = pd.read_excel(imbie_dir  + 'imbie_dataset-2018_07_23.xlsx', sheet_name='Antarctica')
-    im_df = im_df.set_index('Year')
-    im_df = pd.DataFrame(data=dict( Antarctica=im_df[im_df.columns[2]]))
-    im_df['Year_int'] = im_df.index.astype(int)
-    grouped = im_df.groupby('Year_int', axis=0)
-    im_full_years = grouped.size() == 12
-    im_df = grouped.mean()
-    im_df = im_df[im_full_years] # The last year doesn't have 12 month of data available so exclude it
+def ant_imbie18(extrap_back=False, extrap=False):
+    """Read IMBIE 2018 excel data, compute yearly averages and return a data
+    frame of sea level rise in cm
+    """
+    imbie_dir = PATH_SLBudgets_data + "Antarctica/IMBIE2018/"
+    im_df = pd.read_excel(
+        imbie_dir + "imbie_dataset-2018_07_23.xlsx", sheet_name="Antarctica"
+    )
 
-    # Extend the data to 1950 with zeros
-    im_df = im_df.reindex(np.arange(1950,2017))
-    im_df = im_df.fillna(0)
+    # Clean up structure: keep 'Year' and target column before grouping
+    im_df = pd.DataFrame(
+        {"Year": im_df["Year"], "Antarctica": im_df[im_df.columns[3]]}
+    )
 
-    # Extrapolate data using the trend in the  last 10 years
+    im_df["Year_int"] = im_df["Year"].astype(int)
+    grouped = im_df.groupby("Year_int")
+    im_full_years = grouped["Antarctica"].count() == 12
+    im_df = grouped[["Antarctica"]].mean()
+
+    # The last year doesn't have 12 months of data available, so exclude it
+    im_df = im_df[im_full_years]
+
+    if extrap_back:
+        # Extend the data to 1950 with zeros
+        im_df = im_df.reindex(np.arange(1950, 2017)).fillna(0)
+
+    # Extrapolate data using the trend in the last 10 years
     if extrap:
-        nby = 10
-        trend = np.polyfit(im_df.loc[2007:2016].index , im_df.loc[2007:2016].Antarctica, 1)[0]
-        for i in range(3):
-            im_df.loc[im_df.index.max() + 1] = im_df.Antarctica.iloc[-1] + trend
-    return im_df / 10 # convert from mm to cm
+        trend = np.polyfit(
+            im_df.loc[2007:2016].index, im_df.loc[2007:2016, "Antarctica"], 1
+        )[0]
+        future_years = np.array([2017, 2018, 2019])
+        future_vals = im_df.loc[2016, "Antarctica"] + trend * np.arange(1, 4)
+        extrap_df = pd.DataFrame(
+            {"Antarctica": future_vals}, index=future_years
+        )
+
+        im_df = pd.concat([im_df, extrap_df])
+
+    return im_df / 10  # convert from mm to cm
 
 def ant_rignot19():
     '''Use data of mass balance from table 2 of Rignot et al. 2019. 
