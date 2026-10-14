@@ -709,39 +709,66 @@ def glaciers_zemp19(tg_id, extrap=False, del_green=False):
             zemp_loc_tot_df.Glaciers.iloc[-1] + trend
     return zemp_loc_tot_df
 
-def ant_imbie18(extrap_back=False, extrap=False):
+def ant_imbie(version, extrap_back=False, extrap=False):
     """Read IMBIE 2018 excel data, compute yearly averages and return a data
     frame of sea level rise in cm
     """
-    imbie_dir = PATH_SLBudgets_data + "Antarctica/IMBIE2018/"
-    im_df = pd.read_excel(
-        imbie_dir + "imbie_dataset-2018_07_23.xlsx", sheet_name="Antarctica"
-    )
 
-    # Clean up structure: keep 'Year' and target column before grouping
-    im_df = pd.DataFrame(
-        {"Year": im_df["Year"], "Antarctica": im_df[im_df.columns[3]]}
-    )
+    if version == 2018:
+        imbie_dir = PATH_SLBudgets_data + "Antarctica/IMBIE2018/"
+        im_df = pd.read_excel(
+            imbie_dir + "imbie_dataset-2018_07_23.xlsx", sheet_name="Antarctica"
+        )
 
-    im_df["Year_int"] = im_df["Year"].astype(int)
-    grouped = im_df.groupby("Year_int")
+        im_df = pd.DataFrame(
+            {"Year": im_df["Year"], "Antarctica": im_df[im_df.columns[3]]}
+        )
+        im_df["Year_int"] = im_df["Year"].astype(int)
+
+    elif version == 2021:
+        im_df = pd.read_csv("../data/Antarctica/IMBIE2021/Results/imbie_antarctica_2021_mm.csv")
+        
+        im_df = pd.DataFrame(
+            {"Year": im_df["Year"], "Antarctica": im_df["Cumulative mass balance (mm)"]}
+        )
+        im_df["Year_int"] = im_df["Year"].astype(int)
+
+    elif version == 2026:
+        im_df = pd.read_csv("../data/Antarctica/IMBIE2026/Results/imbie3_antarctica_mm_partitioned.csv", 
+                    comment='#')
+
+        im_df = pd.DataFrame(
+            {"Date": im_df["Date"], "Antarctica": -im_df["Cumulative mass balance anomaly (mm)"]}
+        )
+        im_df["Year_int"] = pd.to_datetime(im_df["Date"]).dt.year
+    
+    else:
+        print("ERROR: Version not recognised")
+
+    im_df = im_df.rename(columns={"Year_int": "time"})
+    grouped = im_df.groupby("time")
     im_full_years = grouped["Antarctica"].count() == 12
     im_df = grouped[["Antarctica"]].mean()
 
-    # The last year doesn't have 12 months of data available, so exclude it
+    # Exclude incomplete years
     im_df = im_df[im_full_years]
+
+    # Last year of time series
+    last_year = im_df.index[-1].item()
 
     if extrap_back:
         # Extend the data to 1950 with zeros
-        im_df = im_df.reindex(np.arange(1950, 2017)).fillna(0)
+        im_df = im_df.reindex(np.arange(1950, last_year+1)).fillna(0)
 
     # Extrapolate data using the trend in the last 10 years
     if extrap:
+        # Number of years to extrapolate
+        nby = 3
         trend = np.polyfit(
-            im_df.loc[2007:2016].index, im_df.loc[2007:2016, "Antarctica"], 1
+            im_df.iloc[-10:].index, im_df.iloc[-10:]["Antarctica"], 1
         )[0]
-        future_years = np.array([2017, 2018, 2019])
-        future_vals = im_df.loc[2016, "Antarctica"] + trend * np.arange(1, 4)
+        future_years = np.arange(last_year+1, last_year+1+nby)
+        future_vals = im_df.loc[last_year, "Antarctica"] + trend * np.arange(1, 1+nby)
         extrap_df = pd.DataFrame(
             {"Antarctica": future_vals}, index=future_years
         )
@@ -750,10 +777,11 @@ def ant_imbie18(extrap_back=False, extrap=False):
 
     return im_df / 10  # convert from mm to cm
 
-def ant_rignot19():
+def ant_rignot19(extrap_back=False):
     '''Use data of mass balance from table 2 of Rignot et al. 2019. 
     Fit a second order polynomial through these data that covers 1979 to 2017. 
     Extend to 1950 assuming that Antarctica did not loose mass before 1979.'''
+    
     ye = 2019 # Last year plus 1
     dM_79_89 = 40    # Gt/y
     dM_89_99 = 49.6
@@ -768,7 +796,10 @@ def ant_rignot19():
     slr_rig = dM2.cumsum() / 3600 # Convert from Gt to cm
     slr_rig_df = pd.DataFrame(data = dict(time= xy2, Antarctica = slr_rig))
     slr_rig_df = slr_rig_df.set_index('time')
-    slr_rig_df = slr_rig_df.reindex(np.arange(1950,ye)).fillna(0)
+
+    if extrap_back:
+        slr_rig_df = slr_rig_df.reindex(np.arange(1950,ye)).fillna(0)
+        
     return slr_rig_df
 
 def psmsl2mit(tg_id):
